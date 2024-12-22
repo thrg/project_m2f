@@ -6,5 +6,6 @@ from . import (
     register_mapillary_vistas,
     register_coco_panoptic_annos_semseg,
     register_ade20k_instance,
+    register_lostandfound,
     register_mapillary_vistas_panoptic,
 )
