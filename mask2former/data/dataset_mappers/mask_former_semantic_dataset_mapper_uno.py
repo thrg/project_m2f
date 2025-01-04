@@ -128,14 +128,14 @@ class MaskFormerSemanticDatasetMapperWithUNO:
                 )
             )
 
-        rand_index = random.randint(0, len(self.anomaly_image_paths))
+        rand_index = random.randint(0, len(self.anomaly_image_paths)-1)
         anomaly_image = utils.read_image(self.anomaly_image_paths[rand_index], format=self.img_format)
         anomaly_label = utils.read_image(self.anomaly_annotation_paths[rand_index])
 
         all_labels = np.unique(anomaly_label)
         for i in range(3):
-            rand_lable_index = random.randint(0, len(all_labels))
-            anomaly_label_num = all_labels[rand_lable_index]
+            rand_label_index = random.randint(0, len(all_labels)-1)
+            anomaly_label_num = all_labels[rand_label_index]
 
             start_i = random.randint(0, image.shape[0] - anomaly_label.shape[0])
             start_j = random.randint(0, image.shape[1] - anomaly_label.shape[1])
