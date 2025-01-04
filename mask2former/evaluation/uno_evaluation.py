@@ -24,6 +24,7 @@ from detectron2.utils.file_io import PathManager
 from detectron2.utils.logger import create_small_table
 from detectron2.evaluation import DatasetEvaluator
 from sklearn.metrics import average_precision_score, roc_curve, auc
+from detectron2.data import detection_utils as utils
 
 class UNOEvaluator(DatasetEvaluator):
     def __init__(self, dataset_name):
@@ -69,9 +70,7 @@ class UNOEvaluator(DatasetEvaluator):
             s_m2f_uno = (mask_pred * s_uno.view(-1, 1, 1)).sum(0)
             s_m2f_uno = s_m2f_uno.to(self._cpu_device)
 
-            with PathManager.open(self.input_file_to_gt_file[input["file_name"]], "rb") as f:
-                label = np.array(Image.open(f), dtype=np.int32)
-            label = torch.from_numpy(label).view(-1)
+            label = utils.read_image(self.input_file_to_gt_file[input["file_name"]]).view(-1)
 
             self._s_m2f_uno += [s_m2f_uno.view(-1)[label != self._metadata.ignore_label]]
             self._label += [label[label != self._metadata.ignore_label]]

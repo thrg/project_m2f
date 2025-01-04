@@ -35,7 +35,8 @@ TEST:
   EVAL_PERIOD: 1000
 
 DATASETS:
-  TRAIN: ("cityscapes_fine_sem_seg_train", "mapillary_vistas_sem_seg_train")
+  TRAIN: ("cityscapes_fine_sem_seg_train")
+  # TRAIN: ("cityscapes_fine_sem_seg_train", "mapillary_vistas_sem_seg_train")
   TEST: ("lostandfound",)
   # TEST: ("fs_laf_val", "fs_static_val", "road_anomaly")
 
