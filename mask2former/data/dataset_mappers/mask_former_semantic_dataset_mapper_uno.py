@@ -137,10 +137,10 @@ class MaskFormerSemanticDatasetMapperWithUNO:
             rand_lable_index = random.randint(0, len(all_labels))
             anomaly_label_num = all_labels[rand_lable_index]
 
-            start_i = random.randint(0, image.shape[0] - anomaly_label[0])
-            start_j = random.randint(0, image.shape[1] - anomaly_label[1])
-            end_i = start_i + anomaly_label[0]
-            end_j = start_j + anomaly_label[1]
+            start_i = random.randint(0, image.shape[0] - anomaly_label.shape[0])
+            start_j = random.randint(0, image.shape[1] - anomaly_label.shape[1])
+            end_i = start_i + anomaly_label.shape[0]
+            end_j = start_j + anomaly_label.shape[1]
 
             image[start_i:end_i, start_j:end_j, :][anomaly_label == anomaly_label_num] = anomaly_image[anomaly_label == anomaly_label_num]
             sem_seg_gt[start_i: end_i, start_j: end_j][anomaly_label == anomaly_label_num] = 19
