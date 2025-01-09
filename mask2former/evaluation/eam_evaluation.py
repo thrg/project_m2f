@@ -67,7 +67,8 @@ class EAMEvaluator(DatasetEvaluator):
             s_eam = (mask_pred * s_ahm.view(-1, 1, 1)).sum(0)
             s_eam = s_eam.to(self._cpu_device)
 
-            label = utils.read_image(self.input_file_to_gt_file[input["file_name"]]).view(-1)
+            label = utils.read_image(self.input_file_to_gt_file[input["file_name"]])
+            label = torch.Tensor(label).view(-1)
 
             self._s_eam += [s_eam.view(-1)[label != self._metadata.ignore_label]]
             self._label += [label[label != self._metadata.ignore_label]]
