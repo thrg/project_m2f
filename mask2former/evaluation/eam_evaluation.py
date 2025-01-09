@@ -26,7 +26,7 @@ from detectron2.evaluation import DatasetEvaluator
 from sklearn.metrics import average_precision_score, roc_curve, roc_auc_score
 from detectron2.data import detection_utils as utils
 
-class UNOEvaluator(DatasetEvaluator):
+class EAMEvaluator(DatasetEvaluator):
     def __init__(self, dataset_name):
         """
         Args:
@@ -42,11 +42,11 @@ class UNOEvaluator(DatasetEvaluator):
             for dataset_record in DatasetCatalog.get(dataset_name)
         }
         self._label = []
-        self._s_m2f_uno = []
+        self._s_eam = []
 
     def reset(self):
         self._label = []
-        self._s_m2f_uno = []
+        self._s_eam = []
 
     def process(self, inputs, outputs):
         """
@@ -62,15 +62,14 @@ class UNOEvaluator(DatasetEvaluator):
             mask_cls = output['mask_cls']
             mask_pred = mask_pred.sigmoid()
 
-            s_no = mask_cls.softmax(-1)[..., -2]
-            s_unc = -mask_cls.softmax(-1)[..., :-2].max(1)[0]
-            s_uno = s_no + s_unc
-            s_m2f_uno = (mask_pred * s_uno.view(-1, 1, 1)).sum(0)
-            s_m2f_uno = s_m2f_uno.to(self._cpu_device)
+            p = mask_cls.softmax(-1)[..., :-1]
+            s_ahm = -p.max(1)[0]
+            s_eam = (mask_pred * s_ahm.view(-1, 1, 1)).sum(0)
+            s_eam = s_eam.to(self._cpu_device)
 
             label = utils.read_image(self.input_file_to_gt_file[input["file_name"]]).view(-1)
 
-            self._s_m2f_uno += [s_m2f_uno.view(-1)[label != self._metadata.ignore_label]]
+            self._s_eam += [s_eam.view(-1)[label != self._metadata.ignore_label]]
             self._label += [label[label != self._metadata.ignore_label]]
 
     def evaluate(self):
@@ -79,7 +78,7 @@ class UNOEvaluator(DatasetEvaluator):
             img_ids: a list of image IDs to evaluate on. Default to None for the whole dataset
         """
         label = torch.cat(self._label, 0)
-        pred = torch.cat(self._s_m2f_uno, 0)
+        pred = torch.cat(self._s_eam, 0)
 
         AP = 100 * average_precision_score(label, pred)
         AUROC = 100 * roc_auc_score(label, pred)

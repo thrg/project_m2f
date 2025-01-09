@@ -5,6 +5,7 @@ MaskFormer Training Script.
 This script is a simplified version of the training script in detectron2/tools.
 """
 from mask2former.evaluation.uno_evaluation import UNOEvaluator
+from mask2former.evaluation.eam_evaluation import EAMEvaluator
 
 try:
     # ignore ShapelyDeprecationWarning from fvcore
@@ -83,6 +84,8 @@ class Trainer(DefaultTrainer):
         if evaluator_type == "ood_detection":
             if cfg.ANOMALY_DETECTOR == "UNO":
                 evaluator_list.append(UNOEvaluator(dataset_name))
+            elif cfg.ANOMALY_DETECTOR == "EAM":
+                evaluator_list.append(EAMEvaluator(dataset_name))
         # semantic segmentation
         if evaluator_type in ["sem_seg", "ade20k_panoptic_seg"]:
             evaluator_list.append(
