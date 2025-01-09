@@ -68,7 +68,8 @@ class UNOEvaluator(DatasetEvaluator):
             s_m2f_uno = (mask_pred * s_uno.view(-1, 1, 1)).sum(0)
             s_m2f_uno = s_m2f_uno.to(self._cpu_device)
 
-            label = utils.read_image(self.input_file_to_gt_file[input["file_name"]]).view(-1)
+            label = utils.read_image(self.input_file_to_gt_file[input["file_name"]])
+            label = torch.Tensor(label).view(-1)
 
             self._s_m2f_uno += [s_m2f_uno.view(-1)[label != self._metadata.ignore_label]]
             self._label += [label[label != self._metadata.ignore_label]]
