@@ -13,8 +13,8 @@ from sam2.build_sam import build_sam2
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 from scipy.ndimage import measurements
 
-def propagate_in_video(inference_state, start_frame, reverse=False):
-    tracking_database = {}
+def propagate_in_video(start_tracking_database, inference_state, start_frame, reverse=False):
+    tracking_database = start_tracking_database
     for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state,
                                                                                     start_frame_idx=start_frame,
                                                                                     reverse=reverse):
@@ -41,7 +41,7 @@ def save_results(refined_tracking_database, point_database, frame_names, sequenc
         frame_name = frame_names[frame_idx]
         result = -1 * np.ones((1080, 1920))
 
-        if frame_idx in refined_tracking_database:
+        if refined_tracking_database:
             for id, segment_mask in refined_tracking_database[frame_idx].items():
                 if id not in good_ids:
                     continue
@@ -63,11 +63,12 @@ def save_results(refined_tracking_database, point_database, frame_names, sequenc
 
         #print(point_database)
         #print((frame_idx, points))
-        if len(point_database) > 0 and (frame_idx, points) in point_database.items():
-           for i in range(len(points)):
-               point = points[i]
-               cv2.drawMarker(result, (int(point[0]), int(point[1])), (0, 0, 255), markerType=cv2.MARKER_CROSS,
-                              markerSize=10, thickness=2)
+        if frame_idx in point_database:
+            points = point_database[frame_idx]
+            for i in range(len(points)):
+                point = points[i]
+                cv2.drawMarker(result, (int(point[0]), int(point[1])), (0, 0, 255), markerType=cv2.MARKER_CROSS,
+                               markerSize=10, thickness=2)
 
         os.makedirs(os.path.join(result_video_dir, sequence), exist_ok=True)
         cv2.imwrite(os.path.join(result_video_dir, sequence, frame_name), result)
@@ -229,10 +230,10 @@ for sequence in sequences:
         continue
 
     tracked_ids = []
-    tracking_database = propagate_in_video(inference_state, start_frame)
+    tracking_database = propagate_in_video({}, inference_state, start_frame)
 
     if 0 not in tracking_database:
-        tracking_database = propagate_in_video(inference_state, start_frame, True)
+        tracking_database = propagate_in_video(tracking_database, inference_state, start_frame, True)
 
     tracking_database = dict(sorted(tracking_database.items()))
     tracking_database = list(tracking_database.values())
