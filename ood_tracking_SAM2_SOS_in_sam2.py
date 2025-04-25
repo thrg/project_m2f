@@ -119,7 +119,7 @@ model_cfg = "./configs/sam2.1/sam2.1_hiera_s.yaml"
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 
 sam2 = build_sam2(model_cfg, sam2_checkpoint, device='cuda', apply_postprocessing=False)
-mask_generator = SAM2AutomaticMaskGenerator(sam2) #TODO: Mask generator
+mask_generator = SAM2AutomaticMaskGenerator(sam2)
 
 videos_dir = "../datasets/street_obstacle_sequences/raw_data_tmp"
 res_dir = '../datasets/street_obstacle_sequences/ood_prediction_tracked_n_sam/'
@@ -146,7 +146,7 @@ for sequence in sequences:
 
     point_database = {}
 
-    start_frame = len(frame_names) - len(frame_names) // 2 # TODO: Why start frame this?
+    start_frame = len(frame_names) - len(frame_names) // 2
     for frame_id in tqdm(range(0, len(frame_names), len(frame_names) // 10)):
         image_path = os.path.join(video_dir, frame_names[frame_id])
         image = cv2.imread(image_path)
