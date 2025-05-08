@@ -62,6 +62,12 @@ class TrajectoryManager:
             if self.tracked_objects[obj_id]['state'] == "lost":
                 self.tracked_objects[obj_id]['lost_count'] += 1
 
+            if self.tracked_objects[obj_id]['state'] == "pending":
+                self._reconstruct_prompt(obj_id, box, frame_id)
+
+            if self.tracked_objects[obj_id]['lost_count'] > self.lost_tolerance:
+                self.remove_object(obj_id)
+
     def _get_state(self, logits):
         if logits > self.tau_r:
             return "reliable"
@@ -119,6 +125,10 @@ class TrajectoryManager:
         m = Munkres()
         indexes = m.compute(iou_matrix)
 
+        print(indexes)
+        print(self.tracked_objects)
+        print(iou_matrix)
+
         lost_indexes = self._get_unfit_from_indexes(indexes, iou_matrix, len(self.tracked_objects), 1)
         new_indexes = self._get_unfit_from_indexes(indexes, iou_matrix, len(detections), 0)
 
@@ -132,7 +142,18 @@ class TrajectoryManager:
 
         return matched_pairs, lost, new
 
+    @staticmethod
+    def _lines_overlap(x11, x12, x21, x22):
+        return x12 >= x21 and x22 >= x11
+
+    def _boxes_overlap(self, box1, box2):
+        return (self._lines_overlap(box1[0], box1[2], box2[0], box2[2]) and
+                self._lines_overlap(box1[1], box1[3], box2[1], box2[3]))
+
     def _calculate_iou(self, box1, box2):
+        if not self._boxes_overlap(box1, box2):
+            return 0
+
         x_left = max(box1[0], box2[0])
         y_top = max(box1[1], box2[1])
         x_right = min(box1[2], box2[2])
@@ -158,6 +179,7 @@ class TrajectoryManager:
 
     def _filter_new_objects(self, detections, untracked_mask):
         filtered_detections = []
+        old_detections = []
 
         for det in detections:
             x1, y1, x2, y2 = det[0], det[1], det[2], det[3]
@@ -170,8 +192,10 @@ class TrajectoryManager:
 
             if overlap_ratio >= self.untracked_threshold:
                 filtered_detections.append(det)
+            else:
+                old_detections.append(det)
 
-        return filtered_detections
+        return filtered_detections, old_detections
 
     def _reconstruct_prompt(self, obj_id, detection, frame_id):
         print(f"reconstructing object: {obj_id}")
@@ -188,6 +212,26 @@ class TrajectoryManager:
             mask=(out_mask_logits[obj_id][0] > 0.0),
             logits=out_mask_logits[obj_id][0][out_mask_logits[obj_id][0] > 0.0].mean(dim=0)
         )
+
+    def _update_new_object_in_old_detections(self, out_mask_logits, obj_id, old_detections):
+        for det in old_detections:
+            x1, y1, x2, y2 = det[0], det[1], det[2], det[3]
+            mask = (out_mask_logits[obj_id][0] > 0.0).cpu().numpy()
+
+            box_mask = mask[y1:y2, x1:x2]
+
+            box_area = (x2 - x1) * (y2 - y1)
+            overlap_area = np.sum(box_mask)
+            overlap_ratio = overlap_area / box_area
+
+            if overlap_ratio >= 1 - self.untracked_threshold:
+                self.update_object(
+                    obj_id=obj_id,
+                    box=det,
+                    mask=(out_mask_logits[obj_id][0] > 0.0),
+                    logits=out_mask_logits[obj_id][0][out_mask_logits[obj_id][0] > 0.0].mean(dim=0)
+                )
+
 
     def process_frame(self, detections, frame_id):
         matched_pairs, tracked_lost, new_detected = self._hungarian_matching(detections)
@@ -215,9 +259,6 @@ class TrajectoryManager:
                 logits=out_mask_logits[obj_id][0][out_mask_logits[obj_id][0] > 0.0].mean(dim=0)
             )
 
-            if self.tracked_objects[obj_id]['state'] == "pending":
-                self._reconstruct_prompt(obj_id, det, frame_id)
-
         for obj_id in tracked_lost:
             prev_box = self.tracked_objects[obj_id]['box']
             # print(obj_id)
@@ -229,13 +270,14 @@ class TrajectoryManager:
                 logits=out_mask_logits[obj_id][0][out_mask_logits[obj_id][0] > 0.0].mean(dim=0)
             )
 
-            if self.tracked_objects[obj_id]['lost_count'] > self.lost_tolerance:
-                self.remove_object(obj_id)
-
         if new_detected:
             untracked_mask = self._get_untracked_region_mask()
 
-            new_object_candidates = self._filter_new_objects(new_detected, untracked_mask)
+            new_object_candidates, old_detections = self._filter_new_objects(new_detected, untracked_mask)
+
+            if old_detections:
+                for obj_id in tracked_lost:
+                    self._update_new_object_in_old_detections(out_mask_logits, obj_id, old_detections)
 
             for det in new_object_candidates:
                 _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
@@ -362,7 +404,7 @@ model_cfg = "sam2_hiera_s.yaml"
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 
 sam2 = build_sam2(model_cfg, sam2_checkpoint, device='cuda', apply_postprocessing=False)
-mask_generator = SAM2AutomaticMaskGenerator(sam2)
+# mask_generator = SAM2AutomaticMaskGenerator(sam2)
 
 videos_dir = "../datasets/street_obstacle_sequences/raw_data_tmp"
 res_dir = '../datasets/street_obstacle_sequences/ood_prediction_tracked_n_sam/'
@@ -394,8 +436,8 @@ for sequence in sequences:
     start_frame = len(frame_names) - len(frame_names) // 2
     for frame_id in tqdm(range(len(frame_names))):
         image_path = os.path.join(video_dir, frame_names[frame_id])
-        image = cv2.imread(image_path)
-        masks = mask_generator.generate(image)
+        # image = cv2.imread(image_path)
+        # masks = mask_generator.generate(image)
 
         score_path = image_path.replace('raw_data_tmp', 'ood_score').replace('_ood_score', '').replace('jpg', 'npy')
         ood_score = np.load(score_path)
@@ -451,7 +493,7 @@ for sequence in sequences:
 
             box = [x_min, y_min, x_max, y_max]
             boxes_filtered.append(box)
-            # print(box)
+            print(box)
             # print(centroids[i])
 
         num_labels, component_masks, stats, centroids, boxes = (
