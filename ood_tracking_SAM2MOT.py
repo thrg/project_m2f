@@ -13,6 +13,12 @@ from sam2.build_sam import build_sam2
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 from scipy.ndimage import measurements
 from munkres import Munkres
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--sequence', type=str, default='all', help='Sequence')
+
+args = parser.parse_args()
 
 
 class TrajectoryManager:
@@ -20,9 +26,9 @@ class TrajectoryManager:
                  image_shape=(1080, 1920),
                  untracked_threshold: float = 0.7,
                  lost_tolerance: int = 5,
-                 tau_r: float = 0.8,
-                 tau_p: float = 0.6,
-                 tau_s: float = 0.4):
+                 tau_r: float = 5,
+                 tau_p: float = 3,
+                 tau_s: float = 1):
 
         self.untracked_threshold = untracked_threshold
         self.lost_tolerance = lost_tolerance
@@ -62,11 +68,6 @@ class TrajectoryManager:
             if self.tracked_objects[obj_id]['state'] == "lost":
                 self.tracked_objects[obj_id]['lost_count'] += 1
 
-            if self.tracked_objects[obj_id]['state'] == "pending":
-                self._reconstruct_prompt(obj_id, box, frame_id)
-
-            if self.tracked_objects[obj_id]['lost_count'] > self.lost_tolerance:
-                self.remove_object(obj_id)
 
     def _get_state(self, logits):
         if logits > self.tau_r:
@@ -259,6 +260,9 @@ class TrajectoryManager:
                 logits=out_mask_logits[obj_id][0][out_mask_logits[obj_id][0] > 0.0].mean(dim=0)
             )
 
+            if self.tracked_objects[obj_id]['state'] == "pending":
+                self._reconstruct_prompt(obj_id, box, frame_id)
+
         for obj_id in tracked_lost:
             prev_box = self.tracked_objects[obj_id]['box']
             # print(obj_id)
@@ -269,6 +273,9 @@ class TrajectoryManager:
                 mask=(out_mask_logits[obj_id][0] > 0.0),
                 logits=out_mask_logits[obj_id][0][out_mask_logits[obj_id][0] > 0.0].mean(dim=0)
             )
+            
+            if self.tracked_objects[obj_id]['lost_count'] > self.lost_tolerance:
+                self.remove_object(obj_id)
 
         if new_detected:
             untracked_mask = self._get_untracked_region_mask()
@@ -409,12 +416,14 @@ sam2 = build_sam2(model_cfg, sam2_checkpoint, device='cuda', apply_postprocessin
 videos_dir = "../datasets/street_obstacle_sequences/raw_data_tmp"
 res_dir = '../datasets/street_obstacle_sequences/ood_prediction_tracked_n_sam/'
 result_video_dir = '../datasets/street_obstacle_sequences/result_videos_n_sam/'
-threshold = 0.70
+threshold = 0.61
 
 sequences = os.listdir(videos_dir)
 sequences.sort()
 
 for sequence in sequences:
+    if sequence != args.sequence and args.sequence != "all":
+        continue
     print(sequence)
     video_dir = os.path.join(videos_dir, sequence)
     seq_res_dir = os.path.join(res_dir, sequence)
