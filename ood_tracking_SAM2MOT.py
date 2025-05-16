@@ -26,9 +26,9 @@ class TrajectoryManager:
                  image_shape=(1080, 1920),
                  untracked_threshold: float = 0.7,
                  lost_tolerance: int = 5,
-                 tau_r: float = 5,
-                 tau_p: float = 3,
-                 tau_s: float = 1):
+                 tau_r: float = 10,
+                 tau_p: float = 6,
+                 tau_s: float = 2):
 
         self.untracked_threshold = untracked_threshold
         self.lost_tolerance = lost_tolerance
